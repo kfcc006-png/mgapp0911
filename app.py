@@ -17,6 +17,9 @@ st.set_page_config(
 SCHEMA_SNAPSHOT = "2026-09-11"
 CHART_ROW_LIMIT = 5000
 
+DEFAULT_SUPABASE_URL = "https://lrlqgmeghgmowypenfyp.supabase.co"
+DEFAULT_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_EHqRMCLwHWle7a6jdrPRWQ_HSSI4MfW"
+
 TABLE_LABELS = {
     "branches": "지점",
     "members": "조합원",
@@ -500,8 +503,11 @@ st.caption(f"Streamlit + supabase-py | 스키마 기준일: {SCHEMA_SNAPSHOT}")
 
 with st.sidebar:
     st.header("Supabase 연결")
-    default_url = configured_value("SUPABASE_URL")
-    default_key = configured_value("SUPABASE_KEY", "SUPABASE_PUBLISHABLE_KEY")
+    default_url = configured_value("SUPABASE_URL") or DEFAULT_SUPABASE_URL
+    default_key = (
+        configured_value("SUPABASE_KEY", "SUPABASE_PUBLISHABLE_KEY")
+        or DEFAULT_SUPABASE_PUBLISHABLE_KEY
+    )
 
     supabase_url = st.text_input(
         "Supabase URL",
@@ -516,7 +522,7 @@ with st.sidebar:
     )
 
     col_connect, col_clear = st.columns(2)
-    if col_connect.button("연결", type="primary", use_container_width=True):
+    if col_connect.button("다시 연결", type="primary", use_container_width=True):
         try:
             st.session_state["supabase_client"] = connect_client(supabase_url, supabase_key)
             st.session_state["connected_url"] = supabase_url
@@ -540,6 +546,15 @@ with st.sidebar:
 
 client = st.session_state.get("supabase_client")
 
+# 기본 URL/Publishable Key가 포함되어 있으므로 최초 실행 시 자동 연결합니다.
+if client is None:
+    try:
+        client = connect_client(supabase_url, supabase_key)
+        st.session_state["supabase_client"] = client
+        st.session_state["connected_url"] = supabase_url
+    except Exception as exc:
+        st.error(f"Supabase 자동 연결 실패: {exc}")
+
 rls_off = [table_label(name) for name, cfg in TABLES.items() if not cfg["rls"]]
 with st.expander("보안 상태", expanded=True):
     st.warning(
@@ -552,7 +567,7 @@ with st.expander("보안 상태", expanded=True):
     )
 
 if client is None:
-    st.info("왼쪽 메뉴에서 Supabase URL과 API Key를 입력한 후 '연결' 버튼을 눌러 주세요.")
+    st.info("기본 Supabase 연결에 실패했습니다. 왼쪽 메뉴에서 URL과 API Key를 확인한 후 다시 연결해 주세요.")
     st.stop()
 
 selected_table = st.selectbox(
